@@ -18,6 +18,7 @@ type Wallpaper struct {
 	extension string
 	link      string
 	name      string
+	preview   string
 }
 
 const root = "/tmp/wallpaper/"
@@ -44,7 +45,9 @@ func Parse(object []byte) ([]Wallpaper, error) {
 		filetype := wallpaper["file_type"].(string)
 		extension := strings.Split(filetype, "/")[1]
 		name := fmt.Sprintf("%s.%s", id, extension)
-		new_wallpaper := Wallpaper{id, extension, link, name}
+		thumb := wallpaper["thumbs"].(map[string]interface{})["large"].(string)
+
+		new_wallpaper := Wallpaper{id, extension, link, name, thumb}
 
 		wallpapers = append(wallpapers, new_wallpaper)
 	}
@@ -53,7 +56,7 @@ func Parse(object []byte) ([]Wallpaper, error) {
 
 }
 
-func DownloadFile(wallpaper Wallpaper) error {
+func DownloadFile(wallpaper *Wallpaper) error {
 	path := fmt.Sprint(root, wallpaper.name)
 
 	if err := os.MkdirAll(root, os.ModePerm); err != nil {
@@ -82,11 +85,11 @@ func DownloadFile(wallpaper Wallpaper) error {
 	return nil
 }
 
-func DonwloadWallpaper() (string, error) {
+func DonwloadWallpaper() (*Wallpaper, error) {
 	resp, err := http.Get("https://wallhaven.cc/api/v1/search?categories=010")
 
 	if err != nil {
-		return "", fmt.Errorf("DownloadWallpaper: %w", err)
+		return nil, fmt.Errorf("DownloadWallpaper: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -94,21 +97,21 @@ func DonwloadWallpaper() (string, error) {
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		return "", fmt.Errorf("DownloadWallpaper: %w", err)
+		return nil, fmt.Errorf("DownloadWallpaper: %w", err)
 	}
 
 	wallpapers, _ := Parse(body)
-	wallpaper := wallpapers[rand.Intn(len(wallpapers))]
+	wallpaper := &wallpapers[rand.Intn(len(wallpapers))]
 
 	if err := DownloadFile(wallpaper); err != nil {
-		return "", fmt.Errorf("DownloadWallpaper: %w", err)
+		return nil, fmt.Errorf("DownloadWallpaper: %w", err)
 	}
 
-	return wallpaper.name, nil
+	return wallpaper, nil
 }
 
-func SwitchWallpaper(filename string) error {
-	path := fmt.Sprint(root, filename)
+func SwitchWallpaper(wallpaper *Wallpaper) error {
+	path := fmt.Sprint(root, wallpaper.name)
 	arg0 := "--bg-scale"
 	cmd := exec.Command("feh", arg0, path)
 
@@ -119,15 +122,65 @@ func SwitchWallpaper(filename string) error {
 	return nil
 }
 
-func main() {
-	rand.Seed(time.Now().Unix())
-	name, err := DonwloadWallpaper()
+func DisplayWallpaper(wallpaper *Wallpaper) (*exec.Cmd, error) {
+	arg0 := "-x"
+	cmd := exec.Command("feh", arg0, wallpaper.preview)
 
-	if err != nil {
-		log.Fatal(err)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("DisplayWallpaper %w", err)
 	}
 
-	if err := SwitchWallpaper(name); err != nil {
+	return cmd, nil
+}
+
+func HandleInput() bool {
+	var input string
+
+	for true {
+		fmt.Print("Do you want to set this image? (y/n) ")
+		fmt.Scanln(&input)
+		switch input {
+		case "y":
+			return true
+		case "n":
+			return false
+		default:
+			fmt.Println("Please select between y and n")
+		}
+	}
+
+	return false
+}
+
+func main() {
+	rand.Seed(time.Now().Unix())
+	var wallpaper *Wallpaper
+
+	done := false
+	for !done {
+		var err error
+
+		wallpaper, err = DonwloadWallpaper()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cmd, err := DisplayWallpaper(wallpaper)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		done = HandleInput()
+
+		if err := cmd.Process.Kill(); err != nil {
+			log.Fatal(err)
+		}
+
+	}
+
+	if err := SwitchWallpaper(wallpaper); err != nil {
 		log.Fatal(err)
 	}
 
