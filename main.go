@@ -22,6 +22,7 @@ type Wallpaper struct {
 }
 
 const root = "/tmp/wallpaper/"
+const favorite = "/home/alex/Pictures/Wallpapers/"
 
 func Parse(object []byte) ([]Wallpaper, error) {
 	wallpapers := []Wallpaper{}
@@ -64,19 +65,18 @@ func DownloadFile(wallpaper *Wallpaper) error {
 	}
 
 	file, err := os.Create(path)
+	defer file.Close()
 
 	if err != nil {
 		return fmt.Errorf("DownloadFile: Could not create file: %w", err)
 	}
 
-	defer file.Close()
 	resp, err := http.Get(wallpaper.link)
+	defer resp.Body.Close()
 
 	if err != nil {
 		return fmt.Errorf("DownloadFile: Could not get url %q: %w", wallpaper.link, err)
 	}
-
-	defer resp.Body.Close()
 
 	if _, err = io.Copy(file, resp.Body); err != nil {
 		return fmt.Errorf("DownloadFile: Writing to file failed: %w", err)
@@ -133,11 +133,39 @@ func DisplayWallpaper(wallpaper *Wallpaper) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-func HandleInput() bool {
+// TODO: add an ability for users to change the filename
+func AddToFavorite(wallpaper *Wallpaper) error {
+
+	srcPath := fmt.Sprint(root, wallpaper.name)
+	dstPath := fmt.Sprint(favorite, wallpaper.name)
+
+	srcFile, err := os.Open(srcPath)
+
+	defer srcFile.Close()
+
+	if err != nil {
+		return fmt.Errorf("AddToFavorite: %w", err)
+	}
+
+	dstFile, err := os.Create(dstPath)
+	defer dstFile.Close()
+
+	if err != nil {
+		return fmt.Errorf("AddToFavorite: %w", err)
+	}
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("AddToFavorite: %w", err)
+	}
+
+	return nil
+}
+
+func HandleYesNoInput(s string) bool {
 	var input string
 
 	for true {
-		fmt.Print("Do you want to set this image? (y/n) ")
+		fmt.Print(s)
 		fmt.Scanln(&input)
 		switch input {
 		case "y":
@@ -172,7 +200,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		done = HandleInput()
+		done = HandleYesNoInput("Do you want to set this image? (y/n) ")
 
 		if err := cmd.Process.Kill(); err != nil {
 			log.Fatal(err)
@@ -182,6 +210,12 @@ func main() {
 
 	if err := SwitchWallpaper(wallpaper); err != nil {
 		log.Fatal(err)
+	}
+
+	if HandleYesNoInput("Do you want to add this image to favorites? (y/n) ") {
+		if err := AddToFavorite(wallpaper); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 }
