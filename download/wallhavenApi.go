@@ -54,9 +54,9 @@ func Parse(object []byte) ([]Wallpaper, error) {
 }
 
 func DownloadFile(wallpaper *Wallpaper) error {
-	path := fmt.Sprint(config.Root, wallpaper.Name)
+	path := fmt.Sprint(config.Conf.Root, wallpaper.Name)
 
-	if err := os.MkdirAll(config.Root, os.ModePerm); err != nil {
+	if err := os.MkdirAll(config.Conf.Root, os.ModePerm); err != nil {
 		return fmt.Errorf("DownloadFile: Could not create folder: %w", err)
 	}
 

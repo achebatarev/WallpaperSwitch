@@ -11,8 +11,7 @@ import (
 )
 
 func SwitchWallpaper(wallpaper *download.Wallpaper) error {
-	fmt.Println(wallpaper)
-	path := fmt.Sprint(config.Root, wallpaper.Name)
+	path := fmt.Sprint(config.Conf.Root, wallpaper.Name)
 	arg0 := "--bg-scale"
 	cmd := exec.Command("feh", arg0, path)
 
@@ -36,8 +35,8 @@ func DisplayWallpaper(wallpaper *download.Wallpaper) (*exec.Cmd, error) {
 
 func AddToFavorite(wallpaper *download.Wallpaper) error {
 
-	srcPath := fmt.Sprint(config.Root, wallpaper.Name)
-	dstPath := fmt.Sprint(config.Favorite, wallpaper.Name)
+	srcPath := fmt.Sprint(config.Conf.Root, wallpaper.Name)
+	dstPath := fmt.Sprint(config.Conf.Favorite, wallpaper.Name)
 
 	srcFile, err := os.Open(srcPath)
 
